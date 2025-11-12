@@ -1,6 +1,3 @@
-// app.js
-// Node v22.13.1 compatible
-
 const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
@@ -11,11 +8,11 @@ const cors = require("cors");
 const { CLIENT_RENEG_LIMIT } = require('tls');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.use(express.json());
 app.use(cors())
-// Simple in-memory queue (improved)
+
 class Queue {
   constructor() {
     this.tasks = [];
@@ -27,19 +24,18 @@ class Queue {
   enqueue(task) {
     console.log(`[QUEUE] Enqueuing new task: ${task.name}`);
     this.tasks.push(task);
-    this._runNext();
+    this.runNext();
   }
 
-  async _runNext() {
+  async runNext() {
     if (this.running) return;
-    const next = this.tasks.shift();
-    if (!next) {
+    this.current = this.tasks.shift();
+    if (!this.current) {
       console.log(`[QUEUE] No tasks left to run.`);
       return;
     }
 
     this.running = true;
-    this.current = next;
     console.log(`[QUEUE] Running task: ${next.name}`);
 
     try {
@@ -101,32 +97,20 @@ function parseFlaskJsonOrText(resData) {
   }
 }
 
-// ---------- /create route ----------
 app.post('/create', async (req, res) => {
-  // res.set({
-  //   'Content-Type': 'text/event-stream',
-  //   'Cache-Control': 'no-cache',
-  //   'Connection': 'keep-alive'
-  // });
-  // res.flushHeaders?.();
-
-
   const taskName = `FaceSearchTask-${taskCounter++}`;
-  // console.log(`[TASK] Created new task: ${taskName}`);
   let img = req.body.img.replace(/^data:image\/jpeg;base64,/, "")
-  // let filename = Date.now().toString(36)
-  // fs.writeFileSync(filename+".jpeg", img, 'base64')
-  // res.send({ "status": "ok" })
-  // return
+
   const task = {
     name: taskName,
     run: async () => {
       console.log(`[TASK:${taskName}] Starting execution...`);
-
-      // Example base64 data URI — replace with your actual source
-      // const base64DataURI = img
-
-      // Extract base64 part and decode
+      res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      });
+      res.flushHeaders?.();
       if (!img) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Invalid base64 data URI' })}\n\n`);
         return;
@@ -134,7 +118,7 @@ app.post('/create', async (req, res) => {
 
       // Create FormData and append as a file-like buffer
       const form = new FormData();
-      form.append('selfie', buffer, {
+      form.append('selfie', img, {
         filename,
         contentType: "jpeg"
       });
@@ -241,9 +225,8 @@ app.post('/addToFront', (req, res) => {
 });
 
 app.post('/pause', (req, res) => {
-
-  const { index } = req.body;
-  return
+  jQ.running = req.body;
+  res.send({ "status": "ok", "running": jQ.running })
 });
 
 app.listen(PORT, () => {
@@ -259,10 +242,10 @@ app.listen(PORT, () => {
   }
 
   if (localIps.length > 0) {
-    console.log(`Local IP addresses: ${localIps.join(', ')}`);
+    console.log(`Local IP addresses: ${localIps.join(', ')}:${PORT}`);
   } else {
     console.log('No local IPv4 address found.');
   }
 
-  console.log(`Example app listening on port ${PORT}`);
+  console.log(`Server is listening on port ${PORT}`);
 });
